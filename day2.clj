@@ -1,14 +1,12 @@
 (require '[utils]
          '[clojure.string :as str])
-         
+
 (def test-input "11-22,95-115,998-1012,1188511880-1188511890,222220-222224,1698522-1698528,446443-446449,38593856-38593862,565653-565659,824824821-824824827,2121212118-2121212124")
 
 (defn make-range [s]
-  (let [split (str/split s #"[-]" )]
-    (range (Long/parseLong 
-            (first split))
-           (inc (Long/parseLong
-                 (second split))))))
+  (let [[from to] (str/split s #"[-]")]
+    (range (Long/parseLong from)
+           (inc (Long/parseLong to)))))
 
 (defn parse-ids [input]
   (let [range-strs (str/split input #"[,]")]
@@ -35,23 +33,27 @@
       invalids (mapcat #(filter invalid? %) ids)]
   (apply + invalids))
 
-;; wrong 8959930376
+;; wrong  8959930376
 ;; part 1 13108371860
 
 ;; part 2
 
 (defn invalid2? [n]
   (let [id (Long/toString n)]
-    (re-find #"\b([0-9]+)\1{1,}\b" id)))
+    (re-matches #"([0-9]+)\1{1,}" id)))
 
 (let [ids (parse-ids test-input)
       invalids (mapcat #(filter invalid2? %) ids)]
   (println invalids)
   (apply + invalids))
 
-(let [ids (parse-ids my-input)
-      invalid-colls (map #(filter invalid2? %) ids)
-      invalids (map #(apply + %) invalid-colls)]
-  (apply + invalids))
+(defn add-up-range [r]
+   (let [filtered (filter invalid2? r)]
+    (reduce + filtered)))
+
+(time (let [ids (parse-ids my-input)
+            invalids (pmap add-up-range ids)]
+        ;; (println invalids)
+        (reduce + invalids)))
 
 ;; right 22471660255
