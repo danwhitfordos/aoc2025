@@ -154,21 +154,21 @@
 ;;              '((3) (1 3) (2) (2 3) (0 2) (0 1)) #{'(1 1 0 0)})
 
 (defn shortest-path2 [pq machine visited]
-  (let [[[curr cscore] & _] pq
-        target-joltage (:target-joltage machine)
-        buttons (:buttons machine)]
-    (assert (not (nil? curr)))
-    (assert (contains? curr :joltage))
-    (println cscore "|" curr)
-    (cond
-      (= (:joltage curr) target-joltage)
-      (:pathl curr)
-      :else (let [next (next-steps2 curr buttons visited machine)]
-              (shortest-path2
-               (into (pop pq) next)
-               machine
-               (into visited (map (fn [[node _]]
-                                    (select-keys node [:joltage]))) next))))))
+  (loop [pq pq visited visited]
+    (let [[[curr cscore] & _] pq
+          target-joltage (:target-joltage machine)
+          buttons (:buttons machine)]
+      (assert (not (nil? curr)))
+      (assert (contains? curr :joltage))
+      ;; (println cscore "|" curr)
+      (cond
+        (= (:joltage curr) target-joltage)
+        (:pathl curr)
+        :else (let [next (next-steps2 curr buttons visited machine)]
+                (recur
+                 (into (pop pq) next)
+                 (into visited (map (fn [[node _]]
+                                      (select-keys node [:joltage]))) next)))))))
 
 (defn proc-machine2 [machine]
   (println "Processing" machine)
