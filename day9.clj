@@ -91,9 +91,8 @@
      (> y3 miny)
      (< y3 maxy)
      (or
-      (and (>= minxp minx) (<= minxp maxx))
-      (and (<= maxxp maxx) (>= maxxp minx))
-      (and (<= minxp minx) (>= maxxp maxx))))))
+      (and (< minxp minx) (> maxxp minx))
+      (and (>= minxp minx) (< minxp maxx))))))
 
 (def rect '((5 5) (10 10)))
 (assert (horizontal-overlap? rect '((6 6) (8 6))))
@@ -103,6 +102,8 @@
 (assert (horizontal-overlap? rect '((9 6) (11 6))))
 (assert (horizontal-overlap? rect '((5 6) (15 6))))
 (assert (horizontal-overlap? rect '((9 6) (15 6))))
+(assert (not (horizontal-overlap? rect '((4 6) (5 6)))))
+(assert (not (horizontal-overlap? rect '((10 6) (15 6)))))
 (assert (not (horizontal-overlap? rect '((5 5) (10 5)))))
 (assert (not (horizontal-overlap? rect '((10 5) (15 5)))))
 (assert (not (horizontal-overlap? rect '((0 5) (20 5)))))
@@ -118,9 +119,8 @@
      (> x3 minx)
      (< x3 maxx)
      (or
-      (and (>= minyp miny) (<= minyp maxy))
-      (and (<= maxyp maxy) (>= maxyp miny))
-      (and (<= minyp miny) (>= maxyp maxy))))))
+      (and (< minyp miny) (> maxyp miny))
+      (and (>= minyp miny) (< minyp maxy))))))
 
 (assert (vertical-overlap? rect '((6 6) (6 8))))
 (assert (vertical-overlap? rect '((6 0) (6 20))))
@@ -181,6 +181,7 @@
 
 ;; 4511989482 too high
 ;; 1467575648 wrong
+;; 1476550548
 ;; ..............
 ;; .......#XXX#..
 ;; .......X...X..
