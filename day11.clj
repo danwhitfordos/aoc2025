@@ -1,5 +1,7 @@
-(require '[utils]
-         '[clojure.string :as str])
+(ns day11 (:require
+           [utils]
+           [clojure.string :as str]
+           [clojure.math.combinatorics :as combo]))
 
 (def test-input "aaa: you hhh
 you: bbb ccc

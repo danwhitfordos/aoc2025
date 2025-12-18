@@ -1,6 +1,7 @@
 (require '[utils]
          '[clojure.string :as str]
-         '[clojure.data.priority-map :as pm])
+         '[clojure.data.priority-map :as pm]
+         '[clojure.set :refer [union]])
 
 (def test-input "[.##.] (3) (1,3) (2) (2,3) (0,2) (0,1) {3,5,4,7}
 [...#.] (0,2,3,4) (2,3) (0,4) (0,1,2) (1,2,3,4) {7,5,12,7,2}
@@ -69,7 +70,7 @@
                (into visited (map (fn [[node _]] (:state node))) next))))))
 
 (defn proc-machine [machine]
-  (println "Processing" machine)
+  ;; (println "Processing" machine)
   (let [start-state (take (:nlights machine) (repeat 0))
         target-state (:target-state machine)]
     ;; (shortest-path-tail
@@ -103,11 +104,16 @@
 (defn parse-joltage [bit]
   (parse-button bit))
 
+(defn pattern-from-joltage [joltage]
+  (map #(mod % 2) joltage))
+
 (defn parse-machine2 [line]
   (let [bits (str/split line #" ")
         buttons (parse-buttons (drop-last (rest bits)))
-        joltage (parse-joltage (last bits))]
+        joltage (parse-joltage (last bits))
+        target-pattern (pattern-from-joltage joltage)]
     {:target-joltage joltage
+     :target-pattern target-pattern
      :buttons buttons}))
 
 (defn parse2 [input]
@@ -115,82 +121,149 @@
 
 (parse2 test-input)
 
-(defn apply-joltage [current button]
-  (map-indexed #(if (contains? (set button) %1) (inc %2) %2) current))
+(defn get-paths [buttons pressed]
+  (filter #(not (contains? pressed %)) buttons))
 
-(apply-joltage '(0 0 0 0) '(0 2))
-(apply-joltage '(0 1 2 3) '(1 3))
+(get-paths '((3) (1 3) (2) (2 3) (0 2) (0 1)) #{'(1 3)})
 
-(defn distance [current machine]
-  (apply + (map #(abs (- %2 %1)) (:joltage current) (:target-joltage machine))))
+(defn swap-atomly! [atm key val]
+  (swap! atm assoc key val)
+  val)
 
-(distance {:joltage '(0 0 0 0)} {:target-joltage '(2 3 4 5)})
-(distance {:joltage '(2 3 2 2)} {:target-joltage '(2 3 4 5)})
-(distance {:joltage '(2 3 4 5)} {:target-joltage '(2 3 4 5)})
+(defn powerset [items]
+  (reduce
+   (fn [s x]
+     (union s (map #(conj % x) s)))
+   (hash-set #{})
+   items))
 
-(defn not-dead-end? [current machine]
-  (every? true? (map #(<= %1 %2) (:joltage current) (:target-joltage machine))))
+(powerset '(a b c))
+(powerset '((0 1) (1 2) (3)))
+(powerset '((3) (1,3) (2) (2,3) (0,2) (0,1)))
+(contains? (powerset '((3) (1,3) (2) (2,3) (0,2) (0,1))) #{'(3) '(0 1)})
+(contains? (powerset '((3) (1,3) (2) (2,3) (0,2) (0,1))) #{'(1 3) '(2) '(0 2)})
+(contains? (powerset '((3) (1,3) (2) (2,3) (0,2) (0,1))) #{'(2) '(2 3) '(0 1)})
+(contains? (powerset '((3) (1,3) (2) (2,3) (0,2) (0,1))) #{'(3) '(1 3) '(2 3) '(0 2)})
 
-(not-dead-end? {:joltage '(0 0 0 0)} {:target-joltage '(2 3 4 5)})
-(not-dead-end? {:joltage '(2 3 4 5)} {:target-joltage '(2 3 4 5)})
-(not-dead-end? {:joltage '(2 4 4 5)} {:target-joltage '(2 3 4 5)})
+(defn apply-buttons-to-lights [n buttons]
+  (let [lights (take n (repeat 0))]
+    (reduce apply-button lights buttons)))
 
-(defn next-steps2 [current buttons visited machine]
-  (let [next (map
-              #(let [next-path (inc (:pathl current))
-                     next-joltage (apply-joltage (:joltage current) %)]
-                 [(merge current {:pathl next-path} {:joltage next-joltage})
-                  (+ next-path (distance {:joltage next-joltage} machine))])
-              buttons)
-        filtered (filter #(not (contains? visited (select-keys (first %) [:joltage]))) next)
-        dead (filter #(not-dead-end? (first %) machine) filtered)]
-    ;; (when (not= (count next) (count filtered)) (println "|||"))
-    ;; (when (not= (count filtered) (count dead)) (println "XXX"))
-    dead))
+(apply-buttons-to-lights 4 '((3) (0 1)))
+(apply-buttons-to-lights 4 '((2) (2 3) (0 1)))
 
-;; (next-steps2 {:state '(0 0 0 0) :path [] :joltage '(0 0 0 0)}
-;;              '((3) (1 3) (2) (2 3) (0 2) (0 1)) #{})
-;; (next-steps2 {:state '(0 0 0 0) :path [] :joltage '(1 1 1 1)}
-;;              '((3) (1 3) (2) (2 3) (0 2) (0 1)) #{'(1 1 0 0)})
 
-(defn shortest-path2 [pq machine visited]
-  (loop [pq pq visited visited]
-    (let [[[curr cscore] & _] pq
-          target-joltage (:target-joltage machine)
-          buttons (:buttons machine)]
-      (assert (not (nil? curr)))
-      (assert (contains? curr :joltage))
-      ;; (println cscore "|" curr)
+(defn pattern-lookup [n buttons]
+  (let [ps (powerset buttons)]
+    (loop [[btns & rst] ps res {}]
       (cond
-        (= (:joltage curr) target-joltage)
-        (:pathl curr)
-        :else (let [next (next-steps2 curr buttons visited machine)]
-                (recur
-                 (into (pop pq) next)
-                 (into visited (map (fn [[node _]]
-                                      (select-keys node [:joltage]))) next)))))))
+        (nil? btns) res
+        :else (recur
+               rst
+               (update res (apply-buttons-to-lights n btns) conj btns))))))
 
-(defn proc-machine2 [machine]
-  (println "Processing" machine)
-  (let [start-joltage (take (count (:target-joltage machine)) (repeat 0))]
-    (shortest-path2
-     (pm/priority-map {:joltage start-joltage :pathl 0} 0)
-     machine
-     #{})))
+(pattern-lookup 4 '((3) (0 1)))
+(pattern-lookup 4 '((3) (1,3) (2) (2,3) (0,2) (0,1)))
 
-(proc-machine2 {:target-joltage '(3 5 4 7)
-                :buttons '((3) (1 3) (2) (2 3) (0 2) (0 1))})
 
-(map proc-machine2 (parse2 test-input))
+(->> (parse test-input)
+     (map #(get (pattern-lookup (:nlights %) (:buttons %)) (:target-state %)))
+     (map #(map count %))
+     (map #(reduce min %))
+     (apply +))
 
-(let [machines (parse2 test-input)]
-  (assert (= (transduce
-              (map proc-machine2)
-              +
-              machines) 33)))
+(->> (parse (slurp "day10.txt"))
+     (map #(get (pattern-lookup (:nlights %) (:buttons %)) (:target-state %)))
+     (map #(map count %))
+     (map #(reduce min %))
+     (apply +))
+
+(time (doall (->> (parse (slurp "day10.txt"))
+                  (map #(get (pattern-lookup (:nlights %) (:buttons %)) (:target-state %))))))
+
+(defn apply-button-to-joltage [joltage button]
+  (map-indexed #(if (contains? (set button) %1) (dec %2) %2) joltage))
+
+(defn apply-buttons-to-joltage [joltage buttons]
+  (reduce apply-button-to-joltage joltage buttons))
+
+(apply-buttons-to-joltage '(2 3 5 7) ['(3)])
+(apply-buttons-to-joltage '(3 5 4 7) '((3) (0 1)))
+(apply-buttons-to-joltage '(3 5 4 7) '((1 3) (2) (0 2)))
+(apply-buttons-to-joltage '(3 5 4 7) '((2) (2 3) (0 1)))
+(apply-buttons-to-joltage '(3 5 4 7) '((3) (1 3) (2 3) (0 2)))
+(apply-buttons-to-joltage '(3 5 4 7) #{'(3) '(1 3) '(2 3) '(0 2)})
+
+
+(defn solve-machine [target-joltage patterns]
+  (println target-joltage)
+  (let [target-pattern (pattern-from-joltage target-joltage)
+        valid-paths (get patterns target-pattern)]
+    (loop [[path & rst] valid-paths res [Integer/MAX_VALUE]]
+      (let [next-joltage (apply-buttons-to-joltage target-joltage path)]
+        (cond
+          (nil? path) (apply min res)
+          (every? zero? next-joltage) (recur rst (conj res (count path)))
+          (not (every? #(>= % 0) next-joltage)) (recur rst res)
+          :else (recur
+                 rst
+                 (conj res (+ (count path) (* 2 (solve-machine
+                                                 (map #(/ % 2) next-joltage)
+                                                 patterns))))))))))
+
+(solve-machine
+ '(3 5 4 7)
+ (pattern-lookup 4 '((3) (1 3) (2) (2 3) (0 2) (0 1))))
+
+(solve-machine
+ '(7 5 12 7 2)
+ (pattern-lookup 5 '((0 2 3 4) (2 3) (0 4) (0 1 2) (1 2 3 4))))
+
+(solve-machine
+ '(10 11 11 5 10 5)
+ (pattern-lookup 6 '((0 1 2 3 4) (0 3 4) (0 1 2 4 5) (1 2))))
+
+(solve-machine
+ '(22 8 12 36)
+ (pattern-lookup 4 '((1 3) (0 3) (0 2) (2 3))))
+
+(->> (parse2 test-input)
+     (map #(solve-machine
+            (:target-joltage %)
+            (pattern-lookup (count (:target-joltage %)) (:buttons %)))))
+
+(transduce
+ (map #(solve-machine
+        (:target-joltage %)
+        (pattern-lookup (count (:target-joltage %)) (:buttons %))))
+ +
+ (parse2 test-input))
+
+(assert (= (->> (parse2 test-input)
+                (map #(solve-machine
+                       (:target-joltage %)
+                       (pattern-lookup (count (:target-joltage %)) (:buttons %))))
+                (reduce +)) 33))
 
 (let [machines (parse2 (slurp "day10.txt"))]
-  (transduce
-   (map proc-machine2)
-   +
-   machines))
+  (loop [[hd & rst] machines]
+    (println "Proc" hd)
+    (cond
+      (nil? hd) nil
+      :else (let [res (solve-machine
+                       (:target-joltage hd)
+                       (pattern-lookup (count (:target-joltage hd)) (:buttons hd)))]
+              (assert (< res Integer/MAX_VALUE))
+              (println res)
+              (recur rst)))))
+
+(transduce
+ (map #(solve-machine
+        (:target-joltage %)
+        (pattern-lookup (count (:target-joltage %)) (:buttons %))))
+ +
+ (parse2 (slurp "day10.txt")))
+
+;; too high 6442468051
+;; too high 6442467953
+
