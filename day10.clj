@@ -196,7 +196,7 @@
 
 
 (defn solve-machine [target-joltage patterns]
-  (println target-joltage)
+  ;; (println target-joltage)
   (let [target-pattern (pattern-from-joltage target-joltage)
         valid-paths (get patterns target-pattern)]
     (loop [[path & rst] valid-paths res [Integer/MAX_VALUE]]
@@ -266,4 +266,5 @@
 
 ;; too high 6442468051
 ;; too high 6442467953
+;; 17214 right!
 
