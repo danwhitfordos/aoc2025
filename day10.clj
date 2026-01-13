@@ -165,7 +165,6 @@
 (pattern-lookup 4 '((3) (0 1)))
 (pattern-lookup 4 '((3) (1,3) (2) (2,3) (0,2) (0,1)))
 
-
 (->> (parse test-input)
      (map #(get (pattern-lookup (:nlights %) (:buttons %)) (:target-state %)))
      (map #(map count %))
@@ -267,4 +266,3 @@
 ;; too high 6442468051
 ;; too high 6442467953
 ;; 17214 right!
-
